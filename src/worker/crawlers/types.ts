@@ -23,6 +23,11 @@ export interface RawJob {
   apply_end_date?: string;
   source_url: string;
   source_job_id?: string;
+  source_name?: string;
+  company_type?: string;
+  company_scale?: string;
+  industry?: string;
+  companyId?: string;
 }
 
 export interface CrawlResult {
