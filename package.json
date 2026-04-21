@@ -1,0 +1,40 @@
+{
+  "name": "guopinji-cloudflare",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev:worker": "wrangler dev src/worker/index.ts",
+    "dev:app": "next dev",
+    "build:app": "next build",
+    "build": "next build",
+    "deploy:worker": "wrangler deploy src/worker/index.ts",
+    "deploy:app": "cloudflare",
+    "db:migrate": "wrangler d1 execute guopinji-db --file=./src/worker/db/schema.sql",
+    "db:migrate:dev": "wrangler d1 execute guopinji-db-dev --file=./src/worker/db/schema.sql --env=dev",
+    "db:seed": "tsx scripts/seed.ts",
+    "lint": "next lint",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "hono": "^4.3.0",
+    "next": "14.2.3",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "jose": "^5.3.0",
+    "resend": "^3.2.0",
+    "lucide-react": "^0.378.0"
+  },
+  "devDependencies": {
+    "@cloudflare/next-on-pages": "^1.11.3",
+    "@cloudflare/workers-types": "^4.20240423.0",
+    "@types/node": "^20.12.12",
+    "@types/react": "^18.3.2",
+    "@types/react-dom": "^18.3.0",
+    "autoprefixer": "^10.4.19",
+    "postcss": "^8.4.38",
+    "tailwindcss": "^3.4.3",
+    "tsx": "^4.10.5",
+    "typescript": "^5.4.5",
+    "wrangler": "^3.55.0"
+  }
+}

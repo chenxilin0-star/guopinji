@@ -1,0 +1,58 @@
+name = "guopinji"
+main = "src/worker/index.ts"
+compatibility_date = "2024-04-01"
+compatibility_flags = ["nodejs_compat"]
+
+# D1 数据库
+[[d1_databases]]
+binding = "DB"
+database_name = "guopinji-db"
+database_id = "16eb00c0-8ca0-4239-8865-29a1a0e388c0"
+
+# KV 缓存
+[[kv_namespaces]]
+binding = "CACHE"
+id = "edddb80058064597af06b1a15c2acd07"
+
+# Queues
+[[queues.producers]]
+binding = "CRAWL_QUEUE"
+queue = "crawl-queue"
+
+[[queues.producers]]
+binding = "EMAIL_QUEUE"
+queue = "email-queue"
+
+[[queues.consumers]]
+queue = "crawl-queue"
+max_batch_size = 10
+max_batch_timeout = 30
+
+[[queues.consumers]]
+queue = "email-queue"
+max_batch_size = 100
+max_batch_timeout = 30
+
+# Cron Triggers
+[triggers]
+crons = ["0 */6 * * *", "0 8 * * *", "0 2 * * *"]
+
+# 环境变量
+[vars]
+APP_NAME = "国聘集"
+APP_URL = "https://guopinji.pages.dev"
+JWT_SECRET = "your-jwt-secret-change-me"
+RESEND_API_KEY = "your-resend-api-key"
+
+# 开发环境
+[env.dev]
+name = "guopinji-dev"
+
+[[env.dev.d1_databases]]
+binding = "DB"
+database_name = "guopinji-db-dev"
+database_id = "your-dev-database-id"
+
+[[env.dev.kv_namespaces]]
+binding = "CACHE"
+id = "your-dev-kv-id"
