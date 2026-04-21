@@ -18,7 +18,6 @@ export default function HomePage() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <Header />
       {/* Hero */}
       <section className="bg-gradient-to-br from-blue-900 to-blue-700 text-white py-16 md:py-24">
         <div className="max-w-4xl mx-auto px-4 text-center">
