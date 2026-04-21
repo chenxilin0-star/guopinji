@@ -86,6 +86,16 @@ app.onError((err, c) => {
   return c.json({ error: 'Internal Server Error', message: err.message }, 500);
 });
 
+// 管理员：手动触发爬虫
+app.post('/api/v1/admin/crawl', async (c) => {
+  try {
+    const results = await runAllCrawlers({ DB: c.env.DB, CACHE: c.env.CACHE, fetch });
+    return c.json({ success: true, results });
+  } catch (err: any) {
+    return c.json({ success: false, error: err.message }, 500);
+  }
+});
+
 // Cron Trigger 处理
 export default {
   fetch: app.fetch,
