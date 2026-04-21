@@ -10,6 +10,8 @@ import subscriptionsRoutes from './routes/subscriptions';
 import adminRoutes from './routes/admin';
 import type { Env } from './db';
 
+import { runAllCrawlers } from './crawlers';
+
 const app = new Hono<{ Bindings: Env }>();
 
 app.use('*', cors({
@@ -91,14 +93,21 @@ export default {
     switch (event.cron) {
       case '0 */6 * * *':
         // 每6小时爬虫
-        await env.CRAWL_QUEUE.send({ type: 'crawl_all', time: new Date().toISOString() });
+        console.log('[Cron] 开始爬虫任务');
+        ctx.waitUntil(
+          runAllCrawlers({ DB: env.DB, CACHE: env.CACHE, fetch }).then((results) => {
+            console.log('[Cron] 爬虫完成:', JSON.stringify(results));
+          }).catch((err) => {
+            console.error('[Cron] 爬虫失败:', err);
+          })
+        );
         break;
       case '0 8 * * *':
         // 每日8点推送
         await env.EMAIL_QUEUE.send({ type: 'daily_push', time: new Date().toISOString() });
         break;
       case '0 2 * * *':
-        // 每日2点过期检测
+        // 每日凌晨2点过期检测
         await env.DB.prepare(`UPDATE jobs SET status = 'expired' WHERE apply_end_date < date('now') AND status = 'active'`).run();
         await env.DB.prepare(`UPDATE user_subscriptions SET is_active = 0 WHERE expires_at < datetime('now') AND is_active = 1`).run();
         break;
@@ -108,10 +117,20 @@ export default {
     for (const message of batch.messages) {
       if (batch.queue === 'crawl-queue') {
         // 爬虫任务处理
-        console.log('Crawl task:', message.body);
+        console.log('[Queue] 爬虫任务:', message.body);
+        ctx.waitUntil(
+          runAllCrawlers({ DB: env.DB, CACHE: env.CACHE, fetch }).then((results) => {
+            console.log('[Queue] 爬虫完成:', JSON.stringify(results));
+            message.ack();
+          }).catch((err) => {
+            console.error('[Queue] 爬虫失败:', err);
+            message.retry();
+          })
+        );
       } else if (batch.queue === 'email-queue') {
         // 邮件推送处理
-        console.log('Email task:', message.body);
+        console.log('[Queue] 邮件任务:', message.body);
+        message.ack();
       }
     }
   },
