@@ -82,6 +82,26 @@ app.get('/', optionalAuthMiddleware, rateLimitMiddleware, async (c) => {
   return c.json(result);
 });
 
+// 热门职位
+app.get('/hot', async (c) => {
+  const cacheKey = 'hot_jobs';
+  const cached = await c.env.CACHE.get(cacheKey);
+  if (cached) return c.json(JSON.parse(cached));
+
+  const { results } = await c.env.DB.prepare(`
+    SELECT j.*, c.name as company_name
+    FROM jobs j
+    LEFT JOIN companies c ON j.company_id = c.id
+    WHERE j.is_deleted = 0 AND j.status = 'active'
+    ORDER BY j.created_at DESC
+    LIMIT 10
+  `).all();
+
+  const result = { data: results || [] };
+  await c.env.CACHE.put(cacheKey, JSON.stringify(result), { expirationTtl: 3600 });
+  return c.json(result);
+});
+
 // 职位详情
 app.get('/:id', async (c) => {
   const id = parseInt(c.req.param('id'), 10);

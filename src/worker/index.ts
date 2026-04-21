@@ -29,27 +29,6 @@ app.get('/health', (c) => c.json({ status: 'ok', time: new Date().toISOString() 
 
 // API 路由
 app.route('/api/v1/auth', authRoutes);
-
-// 先注册 jobs 的非路径参数路由，避免被 /:id 拦截
-app.get('/api/v1/jobs/hot', async (c) => {
-  const cacheKey = 'hot_jobs';
-  const cached = await c.env.CACHE.get(cacheKey);
-  if (cached) return c.json(JSON.parse(cached));
-
-  const { results } = await c.env.DB.prepare(`
-    SELECT j.*, c.name as company_name
-    FROM jobs j
-    LEFT JOIN companies c ON j.company_id = c.id
-    WHERE j.is_deleted = 0 AND j.status = 'active'
-    ORDER BY j.created_at DESC
-    LIMIT 10
-  `).all();
-
-  const result = { data: results || [] };
-  await c.env.CACHE.put(cacheKey, JSON.stringify(result), { expirationTtl: 3600 });
-  return c.json(result);
-});
-
 app.route('/api/v1/jobs', jobsRoutes);
 app.route('/api/v1/companies', companiesRoutes);
 app.route('/api/v1/codes', codesRoutes);
