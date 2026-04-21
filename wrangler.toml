@@ -56,3 +56,6 @@ database_id = "your-dev-database-id"
 [[env.dev.kv_namespaces]]
 binding = "CACHE"
 id = "your-dev-kv-id"
+
+# Pages 构建输出目录
+pages_build_output_dir = ".vercel/output/static"
