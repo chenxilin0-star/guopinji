@@ -1,8 +1,9 @@
 import type { Crawler, CrawlResult, RawJob } from './types';
 
 /**
- * 国聘网爬虫
- * 通过 gp-api.iguopin.com 获取职位数据
+ * 国聘网爬虫 - 使用公开 v1 API
+ * API 端点: https://gp-api.iguopin.com/api/jobs/v1/list
+ * 无需签名认证，直接访问
  */
 export const iguopinCrawler: Crawler = {
   name: '国聘网',
@@ -27,67 +28,111 @@ export const iguopinCrawler: Crawler = {
     };
 
     try {
-      // 尝试多个 API 端点获取数据
-      const endpoints = [
-        { path: '/api/jobs/v1/recom-job', method: 'POST', body: { page: 1, size: 50 } },
-        { path: '/api/recruit/v1/search', method: 'POST', body: { page: 1, size: 50, keyword: '' } },
-      ];
+      // 获取多页数据，每页20条
+      const allJobs: RawJob[] = [];
+      const maxPages = 10; // 最多获取10页，共200条
 
-      let allJobs: RawJob[] = [];
-
-      for (const endpoint of endpoints) {
+      for (let page = 1; page <= maxPages; page++) {
         try {
-          const res = await fetch(`${API_BASE}${endpoint.path}`, {
-            method: endpoint.method,
+          const res = await fetch(`${API_BASE}/api/jobs/v1/list`, {
+            method: 'POST',
             headers,
-            body: JSON.stringify(endpoint.body),
+            body: JSON.stringify({
+              page: page,
+              page_size: 20,
+              keyword: '',
+            }),
           });
 
-          if (!res.ok) continue;
+          if (!res.ok) {
+            result.errors.push(`Page ${page}: HTTP ${res.status}`);
+            break;
+          }
 
           const data = await res.json() as any;
-          if (data.code !== 200 || !data.data?.list) continue;
+          if (data.code !== 200 || !data.data?.list) {
+            result.errors.push(`Page ${page}: 无效响应 ${data.msg || ''}`);
+            break;
+          }
 
-          const jobs = data.data.list.map((item: any): RawJob => ({
-            source_id: this.sourceId,
-            title: item.title || item.position_name || '未知职位',
-            company_name: item.company_name || item.enterprise_name || '未知企业',
-            job_type: item.job_type || item.type_name,
-            department: item.department,
-            education: item.education || item.education_requirement,
-            experience: item.experience || item.experience_requirement,
-            major: item.major,
-            salary_text: item.salary || item.salary_text,
-            work_location: item.work_location || item.address,
-            province: item.province,
-            city: item.city,
-            description: item.description || item.job_description,
-            requirements: item.requirements,
-            publish_date: item.publish_date || item.created_at,
-            apply_end_date: item.apply_end_date,
-            source_url: item.source_url || `${this.sourceUrl}/job/${item.id}`,
-            source_job_id: String(item.id || item.job_id),
-          }));
+          const list = data.data.list;
+          if (!list.length) break; // 没有更多数据了
 
-          allJobs = allJobs.concat(jobs);
+          for (const item of list) {
+            // 提取地区信息
+            let province = '';
+            let city = '';
+            let workLocation = '';
+            if (item.district_list && item.district_list.length > 0) {
+              const district = item.district_list[0];
+              province = district.area_cn || '';
+              city = district.city || '';
+              workLocation = district.address || district.area_cn || '';
+            }
+
+            // 提取薪资文本
+            let salaryText = '';
+            if (item.is_negotiable) {
+              salaryText = '薪资面议';
+            } else if (item.min_wage || item.max_wage) {
+              salaryText = `${item.min_wage || 0}-${item.max_wage || 0} ${item.wage_unit_cn || '元/月'}`;
+            }
+
+            // 提取公司类型（国企/央企等）
+            const companyType = item.company_info?.nature_cn || '';
+            const industry = item.company_info?.industry_cn || '';
+            const companyScale = item.company_info?.scale_cn || '';
+
+            const job: RawJob = {
+              source_id: this.sourceId,
+              title: item.job_name || '未知职位',
+              company_name: item.company_name || '未知企业',
+              job_type: item.recruitment_type_cn || item.nature_cn || '',
+              department: item.department_cn || '',
+              education: item.education_cn || '',
+              experience: item.experience_cn || '',
+              major: item.major_cn ? item.major_cn.join(', ') : '',
+              salary_text: salaryText,
+              work_location: workLocation,
+              province: province,
+              city: city,
+              description: item.contents || '',
+              requirements: '', // 职位描述中已包含任职要求
+              publish_date: item.create_time || item.start_time || '',
+              apply_end_date: item.end_time || '',
+              source_url: `${this.sourceUrl}/job/${item.job_id}`,
+              source_job_id: String(item.job_id || ''),
+              // 额外字段（用于数据库扩展）
+              company_type: companyType,
+              industry: industry,
+              company_scale: companyScale,
+            };
+
+            allJobs.push(job);
+          }
+
+          // 如果这页不满，说明没有更多数据了
+          if (list.length < 20) break;
+
         } catch (e: any) {
-          result.errors.push(`${endpoint.path}: ${e.message}`);
+          result.errors.push(`Page ${page}: ${e.message}`);
+          break;
         }
       }
 
       // 去重
       const seen = new Set<string>();
-      allJobs = allJobs.filter(j => {
+      const uniqueJobs = allJobs.filter(j => {
         const key = `${j.source_job_id}-${j.title}`;
         if (seen.has(key)) return false;
         seen.add(key);
         return true;
       });
 
-      result.total = allJobs.length;
+      result.total = uniqueJobs.length;
 
       // 写入数据库
-      for (const job of allJobs) {
+      for (const job of uniqueJobs) {
         const { newCount, updateCount } = await saveJob(DB, job);
         result.newJobs += newCount;
         result.updatedJobs += updateCount;
@@ -95,11 +140,15 @@ export const iguopinCrawler: Crawler = {
 
       // 更新爬虫时间
       await DB.prepare(
-        'UPDATE job_sources SET last_crawl_at = CURRENT_TIMESTAMP WHERE id = ?'
+        'UPDATE job_sources SET last_crawl_at = CURRENT_TIMESTAMP, last_success_at = CURRENT_TIMESTAMP, success_count = success_count + 1 WHERE id = ?'
       ).bind(this.sourceId).run();
 
     } catch (e: any) {
       result.errors.push(`爬虫异常: ${e.message}`);
+      // 记录失败
+      await DB.prepare(
+        'UPDATE job_sources SET fail_count = fail_count + 1 WHERE id = ?'
+      ).bind(this.sourceId).run();
     }
 
     return result;
@@ -111,7 +160,7 @@ export const iguopinCrawler: Crawler = {
  */
 async function saveJob(
   DB: D1Database,
-  job: RawJob
+  job: RawJob & { company_type?: string; industry?: string; company_scale?: string }
 ): Promise<{ newCount: number; updateCount: number }> {
   let newCount = 0;
   let updateCount = 0;
@@ -122,12 +171,29 @@ async function saveJob(
     'SELECT id FROM companies WHERE name = ? LIMIT 1'
   ).bind(job.company_name).first<{ id: number }>();
 
-  if (existingCompany) {
+    if (existingCompany) {
     companyId = existingCompany.id;
+    // 更新公司信息
+    await DB.prepare(`
+      UPDATE companies SET
+        industry = COALESCE(NULLIF(?, ''), industry),
+        scale = COALESCE(NULLIF(?, ''), scale),
+        company_type = COALESCE(NULLIF(?, ''), company_type),
+        is_state_owned = 1
+      WHERE id = ?
+    `).bind(job.industry || '', job.company_scale || '', job.company_type || '', companyId).run();
   } else {
-    const companyRes = await DB.prepare(
-      'INSERT INTO companies (name, province, city) VALUES (?, ?, ?)'
-    ).bind(job.company_name, job.province || '', job.city || '').run();
+    const companyRes = await DB.prepare(`
+      INSERT INTO companies (name, industry, scale, company_type, province, city, is_state_owned)
+      VALUES (?, ?, ?, ?, ?, ?, 1)
+    `).bind(
+      job.company_name,
+      job.industry || '',
+      job.company_scale || '',
+      job.company_type || '',
+      job.province || '',
+      job.city || ''
+    ).run();
     companyId = companyRes.meta?.last_row_id || null;
   }
 

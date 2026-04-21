@@ -50,11 +50,28 @@ CREATE TABLE IF NOT EXISTS jobs (
     apply_end_date TEXT,
     source_url TEXT NOT NULL,
     source_job_id TEXT,
+    source_name TEXT,
     status TEXT DEFAULT 'active',
     is_deleted INTEGER DEFAULT 0,
     created_at TEXT DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT DEFAULT CURRENT_TIMESTAMP
 );
+
+-- 爬虫日志表
+CREATE TABLE IF NOT EXISTS crawl_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    source TEXT NOT NULL,
+    status TEXT NOT NULL,
+    fetched_count INTEGER,
+    inserted_count INTEGER,
+    updated_count INTEGER,
+    error_message TEXT,
+    started_at TEXT DEFAULT CURRENT_TIMESTAMP,
+    finished_at TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_crawl_logs_source ON crawl_logs(source);
+CREATE INDEX IF NOT EXISTS idx_crawl_logs_started_at ON crawl_logs(started_at);
 
 -- 职位全文搜索索引 (FTS5)
 CREATE VIRTUAL TABLE IF NOT EXISTS jobs_fts USING fts5(

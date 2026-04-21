@@ -76,6 +76,47 @@ app.post('/api/v1/admin/crawl', async (c) => {
   }
 });
 
+// 管理员：执行数据库迁移
+app.post('/api/v1/admin/migrate', async (c) => {
+  try {
+    const migrations = [
+      `ALTER TABLE jobs ADD COLUMN IF NOT EXISTS source_name TEXT;`,
+      `CREATE TABLE IF NOT EXISTS crawl_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        source TEXT NOT NULL,
+        status TEXT NOT NULL,
+        fetched_count INTEGER,
+        inserted_count INTEGER,
+        updated_count INTEGER,
+        error_message TEXT,
+        started_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        finished_at TEXT
+      );`,
+      `CREATE INDEX IF NOT EXISTS idx_crawl_logs_source ON crawl_logs(source);`,
+      `CREATE INDEX IF NOT EXISTS idx_crawl_logs_started_at ON crawl_logs(started_at);`,
+    ];
+
+    const results: { sql: string; success: boolean; error?: string }[] = [];
+    for (const sql of migrations) {
+      try {
+        await c.env.DB.prepare(sql).run();
+        results.push({ sql: sql.trim().split('\n')[0], success: true });
+      } catch (err: any) {
+        // 如果字段已存在，忽略错误
+        if (err.message && (err.message.includes('duplicate column') || err.message.includes('already exists'))) {
+          results.push({ sql: sql.trim().split('\n')[0], success: true });
+        } else {
+          results.push({ sql: sql.trim().split('\n')[0], success: false, error: err.message });
+        }
+      }
+    }
+
+    return c.json({ success: true, results });
+  } catch (err: any) {
+    return c.json({ success: false, error: err.message }, 500);
+  }
+});
+
 // Cron Trigger 处理
 export default {
   fetch: app.fetch,
