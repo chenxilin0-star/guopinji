@@ -261,14 +261,14 @@ async function saveJob(
         education = ?, experience = ?, major = ?, salary_text = ?,
         work_location = ?, province = ?, city = ?, description = ?,
         requirements = ?, publish_date = ?, apply_end_date = ?,
-        source_url = ?, status = 'active', is_deleted = 0
+        source_url = ?, source_name = ?, status = 'active', is_deleted = 0
       WHERE id = ?
     `).bind(
       job.title, companyId, job.job_type || '', job.department || '',
       job.education || '', job.experience || '', job.major || '', job.salary_text || '',
       job.work_location || '', job.province || '', job.city || '', job.description || '',
       job.requirements || '', job.publish_date || '', job.apply_end_date || '',
-      job.source_url, existingJob.id
+      job.source_url, job.source_name || '', existingJob.id
     ).run();
     updateCount = 1;
   } else {
@@ -277,14 +277,14 @@ async function saveJob(
         source_id, company_id, title, job_type, department,
         education, experience, major, salary_text,
         work_location, province, city, description, requirements,
-        publish_date, apply_end_date, source_url, source_job_id
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        publish_date, apply_end_date, source_url, source_job_id, source_name
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       job.source_id, companyId, job.title, job.job_type || '', job.department || '',
       job.education || '', job.experience || '', job.major || '', job.salary_text || '',
       job.work_location || '', job.province || '', job.city || '', job.description || '',
       job.requirements || '', job.publish_date || '', job.apply_end_date || '',
-      job.source_url, job.source_job_id || ''
+      job.source_url, job.source_job_id || '', job.source_name || ''
     ).run();
     newCount = 1;
   }

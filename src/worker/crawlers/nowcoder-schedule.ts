@@ -179,7 +179,7 @@ async function saveJob(
       job.education || '', job.experience || '', job.major || '', job.salary_text || '',
       job.work_location || '', job.province || '', job.city || '', job.description || '',
       job.requirements || '', job.publish_date || '', job.apply_end_date || '',
-      job.source_url, existingJob.id
+      job.source_url, job.source_name || '', existingJob.id
     ).run();
     updateCount = 1;
   } else {
@@ -195,7 +195,7 @@ async function saveJob(
       job.education || '', job.experience || '', job.major || '', job.salary_text || '',
       job.work_location || '', job.province || '', job.city || '', job.description || '',
       job.requirements || '', job.publish_date || '', job.apply_end_date || '',
-      job.source_url, job.source_job_id || ''
+      job.source_url, job.source_job_id || '', job.source_name || ''
     ).run();
     newCount = 1;
   }

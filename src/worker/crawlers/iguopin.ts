@@ -30,7 +30,7 @@ export const iguopinCrawler: Crawler = {
     try {
       // 获取多页数据，每页20条
       const allJobs: RawJob[] = [];
-      const maxPages = 10; // 最多获取10页，共200条
+      const maxPages = 3; // 减少页数以避免 Workers 子请求限制
 
       for (let page = 1; page <= maxPages; page++) {
         try {
